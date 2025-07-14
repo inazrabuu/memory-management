@@ -13,7 +13,7 @@ Memory issues in JavaScript / Node.js can be silent killers—draining performan
 
 ## Memory Leak Summary
 
-1. **setInterval Never Cleared**
+## 1. **setInterval Never Cleared**
 
 ### Problem
 - setInterval() retains a closure that holds a large object ( Array, Buffer, etc)
