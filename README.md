@@ -31,9 +31,9 @@ Memory issues in JavaScript / Node.js can be silent killers, draining performanc
 ```node
 const interval = setInterval(() => {
   // logic
-}, 1000);
+}, 1000)
 
-setTimeout(() => clearInterval(interval), 10000);
+setTimeout(() => clearInterval(interval), 10000)
 ```
 
 ### 2. EventEmitter Listeners Never Removed
@@ -53,9 +53,81 @@ setTimeout(() => clearInterval(interval), 10000);
 - Or use `once() ` for one-time events
 
 ```node
-const onMessage = (msg) => { ... };
-emitter.on('event', onMessage);
+const onMessage = (msg) => { ... }
+emitter.on('event', onMessage)
 
 // Cleanup
 emitter.removeListener('event', onMessage);
 ```
+
+### 3. Cache with Strong Reference in `Map`
+
+#### Problem
+- Storing ephemereal object keys in a `Map` (e.g `Map<user, result>`)
+- JS `Map` holds strong references -> keys & values never GC'd
+
+#### Symptoms
+- Growing cache size
+- `Map` retains user/request objects and their inner data
+- Heap snapshot shows chain: `Map -> Key -> Object -> Large Data`
+
+#### Fix
+- Use `WeakMap` for object keys you don't want to retain forever
+
+```node
+const cache = new WeakMap()
+
+function getCached(obj) {
+  if (!cache.has(obj)) {
+    cache.set(obj, compute(obj))
+  }
+
+  return cache.get(obj)
+}
+```
+
+### 4. Async Callback Retaining Large Buffers
+
+#### Problem
+- Large buffers or objects are passed into async closures
+- Promises stay pending -> closure (and buffers) not collected
+- Stored in queue or unresolved task list
+
+#### Symptoms
+- Snapshot shows Buffers held by closure inside pending Promise
+- Growing number of `Buffers` or `ArrayBuffer` instances
+
+#### Fix
+- Avoid holding large data in async closures unless needed
+- Extract relevant into first, then release the reference
+
+```node
+const buffer = Buffer.alloc(10_000_000) //10Mb
+const hash = buffer.toString('hex', 0, 0)
+
+setTimeout(() => {
+  console.log(`Done with ${hash})
+}, 60000)
+```
+
+### Useful Tools
+| Tool | use | 
+|------|-----|
+| `heapdump` | Trigger & save `.heapdump` |
+| ChromeDevTools | Load snapshots, inspect memory |
+| 'Retainers' view | Trace GC path of retained objects |
+| `--inspect` flag | Enable remote debugging |
+| CLI tools like `curl` | Simulate repeated triggers |
+
+### General Fix Patterns
+| Leak Type | Fix | 
+|------|-----|
+| Unstopped intervals | `clearInterval()` |
+| Long-lived listeners | `removeListener()` or `once()` |
+| Growing cache | Use `WeakMap` or TTL logic |
+| Aync closures with large data | Decouple or nullify references only |
+
+### Warning Signs
+- Snapshots size increases linearly with usage
+- Increasing count of similar object types (`Array`, `Buffer`, `Closure`)
+- 'Retainers' show unexpected GC roots (e.g., `Map`, `EventEmitter`, global)
