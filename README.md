@@ -13,22 +13,22 @@ Memory issues in JavaScript / Node.js can be silent killers—draining performan
 
 ## Memory Leak Summary
 
-## 1. **setInterval Never Cleared**
+### 1. **setInterval Never Cleared**
 
-### Problem
+#### Problem
 - setInterval() retains a closure that holds a large object ( Array, Buffer, etc)
 - Never calling clearInterval() -> memory grows over time
 
-### Symptoms
+#### Symptoms
 - Repeating timers that never stop
 - Retained closures in heap snapshots
 - Increasing retained heap size per interval
 
-### Fix
+#### Fix
 - Use clearInterval() affter a timeout or condition
 - Or use setTimeout() if no repeating is needed
 
-```
+```node
 const interval = setInterval(() => {
   // logic
 }, 1000);
